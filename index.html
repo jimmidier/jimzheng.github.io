@@ -155,7 +155,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://jimzheng.com/abp-extension-1-test/">
+    <link itemprop="mainEntityOfPage" href="https://jimzheng.com/abp-extension-2/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.gif">
@@ -169,7 +169,7 @@
       <header class="post-header">
         <h2 class="post-title" itemprop="name headline">
           
-            <a href="/abp-extension-1-test/" class="post-title-link" itemprop="url">基于Abp的扩展模块实现第1例 - 数据权限控制（测试）</a>
+            <a href="/abp-extension-2/" class="post-title-link" itemprop="url">基于Abp的扩展模块实现第2例 - 数据字段按需更新（开发）</a>
         </h2>
 
         <div class="post-meta">
@@ -180,7 +180,7 @@
               <span class="post-meta-item-text">发表于</span>
               
 
-              <time title="创建时间：2021-08-02 20:14:42 / 修改时间：21:23:46" itemprop="dateCreated datePublished" datetime="2021-08-02T20:14:42+08:00">2021-08-02</time>
+              <time title="创建时间：2021-08-31 21:53:42 / 修改时间：22:48:39" itemprop="dateCreated datePublished" datetime="2021-08-31T21:53:42+08:00">2021-08-31</time>
             </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -207,6 +207,112 @@
 <ul>
 <li><a href="/abp-extension-preface">基于Abp的扩展模块实现 - 前言</a></li>
 <li><a href="/abp-extension-1">基于Abp的扩展模块实现第1例 - 数据权限控制（开发）</a></li>
+<li><a href="/abp-extension-1-test">基于Abp的扩展模块实现第1例 - 数据权限控制（测试）</a></li>
+</ul>
+<h1 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h1><p>在实际开发场景中，我们经常会遇到更新部分数据字段的需要。然而在Abp的默认关系型数据库ORM（即EF Core）中，并没有提供对数据字段按需更新的实现。本博文将在尽量保证通用性的前提下实现一个简单的EF Core按需更新机制。</p>
+<h1 id="目标"><a href="#目标" class="headerlink" title="目标"></a>目标</h1><p>支持通过给实体标注特性的方式，引导EF Core更新部分字段。本博文将实现一个更新非默认值字段的机制。</p>
+<h1 id="思路"><a href="#思路" class="headerlink" title="思路"></a>思路</h1><p>在调用<code>DbContext</code>的<code>SaveChanges</code>方法进行数据更新时，EF Core的更改跟踪机制会遍历实体字段获取更改状态信息。通过重写<code>AbpDbContext</code>的<code>ApplyAbpConceptsForModifiedEntity</code>方法，我们可以获得一个在进行数据库交互前修改字段更改状态的横切点。另一方面，通过利用<code>PropertyEntry</code>的<code>Metadata</code>属性，我们可以传入字段的自定义元数据，以引导横切点的判断逻辑。</p>
+<p>因此，大致步骤如下：</p>
+<ol>
+<li>创建一个标注特性类</li>
+<li>针对新创建的特性类，封装EF Core的<code>EntityTypeBuilder</code>扩展方法，为具有该特性的实体字段添加元数据</li>
+<li>重写<code>AbpDbContext</code>的<code>ApplyAbpConceptsForModifiedEntity</code>方法，根据实体字段元数据更新字段更改状态</li>
+</ol>
+<h1 id="编码"><a href="#编码" class="headerlink" title="编码"></a>编码</h1><p>创建特性类<code>PreventUpdateIfDefaultAttribute</code>，用于标注某字段在默认值时不进行更新：</p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title">PreventUpdateIfDefaultAttribute</span> : <span class="title">Attribute</span></span><br><span class="line">&#123;</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在扩展库的<code>EntityTypeBuilderExtensions</code>中，添加一对<code>ConfigurePreventUpdate</code>与<code>TryConfigurePreventUpdate</code>方法。如果还没有这个扩展方法类，就在适当位置创建一个，后续还会用到。</p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">ConfigureByMyConvention</span>(<span class="params"><span class="keyword">this</span> EntityTypeBuilder b</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">//...</span></span><br><span class="line">    b.TryConfigurePreventUpdate();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">//...</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">ConfigurePreventUpdate</span>&lt;<span class="title">T</span>&gt;(<span class="params"><span class="keyword">this</span> EntityTypeBuilder&lt;T&gt; b</span>)</span></span><br><span class="line"><span class="function">    <span class="keyword">where</span> T : <span class="keyword">class</span></span></span><br><span class="line">&#123;</span><br><span class="line">    b.As&lt;EntityTypeBuilder&gt;().TryConfigurePreventUpdate();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">TryConfigurePreventUpdate</span>(<span class="params"><span class="keyword">this</span> EntityTypeBuilder b</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">var</span> properties = b.Metadata.GetProperties();</span><br><span class="line">    <span class="keyword">foreach</span> (<span class="keyword">var</span> property <span class="keyword">in</span> properties)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">if</span> (property.PropertyInfo?.IsDefined(<span class="keyword">typeof</span>(PreventUpdateIfDefaultAttribute), <span class="literal">true</span>) == <span class="literal">true</span>)</span><br><span class="line">        &#123;</span><br><span class="line">            b.Property(property.Name).PreventUpdateIfDefault();</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在上述的<code>TryConfigurePreventUpdate</code>方法中，博主对每个标注了<code>PreventUpdateIfDefaultAttribute</code>特性的字段调用了一个<code>PreventUpdateIfDefault</code>扩展方法。这个扩展方法封装了添加元数据的逻辑：</p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">class</span> <span class="title">MyPropertyBuilderExtensions</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">const</span> <span class="built_in">string</span> PreventUpdateConditionAnnotation = <span class="string">&quot;__PreventUpdateCondition&quot;</span>;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="title">PropertyBuilder</span>&lt;<span class="title">TProperty</span>&gt; <span class="title">PreventUpdate</span>&lt;<span class="title">TProperty</span>&gt;(<span class="params"></span></span></span><br><span class="line"><span class="params"><span class="function">        <span class="keyword">this</span> PropertyBuilder&lt;TProperty&gt; propertyBuilder,</span></span></span><br><span class="line"><span class="params"><span class="function">        Func&lt;<span class="built_in">object</span>, <span class="built_in">bool</span>&gt; predicate,</span></span></span><br><span class="line"><span class="params"><span class="function">        <span class="built_in">bool</span> prevent = <span class="literal">true</span></span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">return</span> propertyBuilder.HasAnnotation(PreventUpdateConditionAnnotation, prevent ? predicate : <span class="literal">null</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> PropertyBuilder <span class="title">PreventUpdate</span>(<span class="params"></span></span></span><br><span class="line"><span class="params"><span class="function">        <span class="keyword">this</span> PropertyBuilder propertyBuilder,</span></span></span><br><span class="line"><span class="params"><span class="function">        Func&lt;<span class="built_in">object</span>, <span class="built_in">bool</span>&gt; predicate,</span></span></span><br><span class="line"><span class="params"><span class="function">        <span class="built_in">bool</span> prevent = <span class="literal">true</span></span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">return</span> propertyBuilder.HasAnnotation(PreventUpdateConditionAnnotation, prevent ? predicate : <span class="literal">null</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="title">PropertyBuilder</span>&lt;<span class="title">TProperty</span>&gt; <span class="title">PreventUpdateIfDefault</span>&lt;<span class="title">TProperty</span>&gt;(<span class="params"><span class="keyword">this</span> PropertyBuilder&lt;TProperty&gt; propertyBuilder</span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">var</span> defaultValue = TypeHelper.GetDefaultValue&lt;TProperty&gt;();</span><br><span class="line">        <span class="keyword">return</span> propertyBuilder.PreventUpdate(property =&gt; property == <span class="literal">null</span> || property.Equals(defaultValue));</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> PropertyBuilder <span class="title">PreventUpdateIfDefault</span>(<span class="params"><span class="keyword">this</span> PropertyBuilder propertyBuilder</span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">var</span> defaultValue = TypeHelper.GetDefaultValue(propertyBuilder.Metadata.ClrType);</span><br><span class="line">        <span class="keyword">return</span> propertyBuilder.PreventUpdate(property =&gt; property == <span class="literal">null</span> || property.Equals(defaultValue));</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>具体而言，对于需要按需更新的字段，博主在<code>PropertyEntry</code>的元数据中加入了一个<code>Func&lt;object, bool&gt;</code>类型的参数，用于在运行时判断是否需要更新。</p>
+<p>最后，在我们的<code>DbContext</code>中对Abp基类的方法进行重写：</p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">protected</span> <span class="keyword">override</span> <span class="keyword">void</span> <span class="title">ApplyAbpConceptsForModifiedEntity</span>(<span class="params">EntityEntry entry, EntityChangeReport changeReport</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">base</span>.ApplyAbpConceptsForModifiedEntity(entry, changeReport);</span><br><span class="line"></span><br><span class="line">    <span class="comment">//...</span></span><br><span class="line">    ApplyPartiallyUpdateConcept(entry);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">protected</span> <span class="keyword">virtual</span> <span class="keyword">void</span> <span class="title">ApplyPartiallyUpdateConcept</span>(<span class="params">EntityEntry entry</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    ApplyPartiallyUpdateConceptForProperties(entry.Properties);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title">ApplyPartiallyUpdateConceptForProperties</span>(<span class="params">IEnumerable&lt;PropertyEntry&gt; properties</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (properties == <span class="literal">null</span>)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">foreach</span> (<span class="keyword">var</span> property <span class="keyword">in</span> properties)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">if</span> (property.Metadata[MyPropertyBuilderExtensions.PreventUpdateConditionAnnotation] <span class="keyword">is</span> Func&lt;<span class="built_in">object</span>, <span class="built_in">bool</span>&gt; predicate)</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="keyword">if</span> (predicate(property.CurrentValue))</span><br><span class="line">            &#123;</span><br><span class="line">                property.IsModified = <span class="literal">false</span>;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这样一来，在通过EF Core进行数据库更新操作时，程序会执行我们的横切点逻辑，并对每个字段进行默认值检查，只有非默认值的标有特性字段才会执行更新操作。<br>实际情况中，可能会有其他不同的按需更新逻辑，但是可通过类似的思路进行实现。</p>
+<p>至此，基于Abp的EF Core实体字段按需更新功能已开发完成。在下一篇博文中，博主会对本文实现的功能编写测试。</p>
+
+      
+    </div>
+
+    
+    
+    
+
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://jimzheng.com/abp-extension-1-test/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Jim Zheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Jim的博客">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/abp-extension-1-test/" class="post-title-link" itemprop="url">基于Abp的扩展模块实现第1例 - 数据权限控制（测试）</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-08-02 20:14:42" itemprop="dateCreated datePublished" datetime="2021-08-02T20:14:42+08:00">2021-08-02</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2021-08-31 21:58:40" itemprop="dateModified" datetime="2021-08-31T21:58:40+08:00">2021-08-31</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Abp/" itemprop="url" rel="index"><span itemprop="name">Abp</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p><font size=4 style="font-weight:bold;">其他系列博文</font></p>
+<ul>
+<li><a href="/abp-extension-preface">基于Abp的扩展模块实现 - 前言</a></li>
+<li><a href="/abp-extension-1">基于Abp的扩展模块实现第1例 - 数据权限控制（开发）</a></li>
+<li><a href="/abp-extension-2">基于Abp的扩展模块实现第2例 - 数据字段按需更新（开发）</a></li>
 </ul>
 <h1 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h1><p>在上一篇博文中，我们通过使用物化路径模型实现了一个基于Abp的数据权限模块，在这一篇中博主将对模块的几个核心功能编写单元测试。</p>
 <h1 id="目标"><a href="#目标" class="headerlink" title="目标"></a>目标</h1><p>覆盖以下几点核心功能：</p>
@@ -319,7 +425,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2021-08-02 20:24:19" itemprop="dateModified" datetime="2021-08-02T20:24:19+08:00">2021-08-02</time>
+                <time title="修改时间：2021-08-31 21:58:21" itemprop="dateModified" datetime="2021-08-31T21:58:21+08:00">2021-08-31</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -346,6 +452,7 @@
 <ul>
 <li><a href="/abp-extension-preface">基于Abp的扩展模块实现 - 前言</a></li>
 <li><a href="/abp-extension-1-test">基于Abp的扩展模块实现第1例 - 数据权限控制（测试）</a></li>
+<li><a href="/abp-extension-2">基于Abp的扩展模块实现第2例 - 数据字段按需更新（开发）</a></li>
 </ul>
 <h1 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h1><p>在大多数企业应用或系统后台中，或多或少会涉及权限系统。一般来说，权限系统可分为操作权限、数据权限两类。<br>操作权限例如菜单权限和按钮权限，可通过用户权限点进行控制，在.NET平台下的常用做法是利用<code>Identity</code>框架或结合前端<code>ACL</code>进行实现。而数据权限作为系统中更为核心的部分，常常隐含用户与数据的层级关系，相比简单的权限点控制而言多了一个变量，导致设计与实现更为困难。<br>不管是复杂如<strong>公司-部门-岗位-项目-用户</strong>，或是简单的<strong>角色-用户</strong>，用户在系统中可访问的数据不仅受权限点影响，还受用户所处层级结构的位置影响。开发过程中，常用做法是在业务代码中实现特定的数据筛选逻辑，例如项目所属用户只能查看该项目下的数据。而这种做法往往只适用于某个系统，若另一个系统层次结构稍有改变则须重新实现。</p>
 <h1 id="目标"><a href="#目标" class="headerlink" title="目标"></a>目标</h1><p>开发一个可集成在Abp中的通用数据权限控制模块。</p>
@@ -468,7 +575,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2021-08-02 20:24:19" itemprop="dateModified" datetime="2021-08-02T20:24:19+08:00">2021-08-02</time>
+                <time title="修改时间：2021-08-31 21:58:21" itemprop="dateModified" datetime="2021-08-31T21:58:21+08:00">2021-08-31</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -495,6 +602,7 @@
 <ul>
 <li><a href="/abp-extension-1">基于Abp的扩展模块实现第1例 - 数据权限控制（开发）</a></li>
 <li><a href="/abp-extension-1-test">基于Abp的扩展模块实现第1例 - 数据权限控制（测试）</a></li>
+<li><a href="/abp-extension-2">基于Abp的扩展模块实现第2例 - 数据字段按需更新（开发）</a></li>
 </ul>
 <h1 id="关于ABP-Framework"><a href="#关于ABP-Framework" class="headerlink" title="关于ABP Framework"></a>关于ABP Framework</h1><p>&emsp;&emsp;<a target="_blank" rel="noopener" href="https://abp.io/">ABP Framework</a> 是一个遵循DDD实践的开源应用程序框架，专注于基于ASP.NET Core的Web应用程序开发，同时支持开发其他类型的应用程序，提供全栈的基础设施支持。该项目最早于2016年12月在 <a target="_blank" rel="noopener" href="https://github.com/abpframework/abp">GitHub</a>创建，截止本文发稿时已迭代至版本4.4.0-preview，收获6.3k个Star，在国内外.NET开发者中拥有较大知名度。</p>
 <p>&emsp;&emsp;ABP Framework（为简洁起见，以下均以Abp代指ABP Framework，若遇<a target="_blank" rel="noopener" href="https://aspnetboilerplate.com/">ASP.NET Boilerplate</a>则另行说明）通过对模块化的完整支持和基于DDD模式的分层设计，从架构分层和应用模块两个方向上进行了拆解和封装。相比更通用的仅对分层方向封装的做法，博主认为Abp的这种设计能更好地支持业务代码跨项目重用，且能更自然地实现微服务兼容。从另一个角度说，这也是种DRY的实践。</p>
@@ -504,78 +612,6 @@
 <h1 id="P-S"><a href="#P-S" class="headerlink" title="P.S."></a>P.S.</h1><p>&emsp;&emsp;Abp提供了详尽的<a target="_blank" rel="noopener" href="https://docs.abp.io/">技术文档</a>，并且由官方积极维护中。为了减少重复，该系列博文不会涉及Abp的基本使用。</p>
 <p>&emsp;&emsp;受限于博主的技术水平，博文中的技术部分难免有不当之处，欢迎批评指正。</p>
 <p>&emsp;&emsp;最后，希望Abp社区继续壮大，.NET技术越来越受欢迎。</p>
-
-      
-    </div>
-
-    
-    
-    
-
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://jimzheng.com/hello-world/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="Jim Zheng">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Jim的博客">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/hello-world/" class="post-title-link" itemprop="url">Hello World</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2021-06-24 22:31:11" itemprop="dateCreated datePublished" datetime="2021-06-24T22:31:11+08:00">2021-06-24</time>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>Welcome to <a target="_blank" rel="noopener" href="https://hexo.io/">Hexo</a>! This is your very first post. Check <a target="_blank" rel="noopener" href="https://hexo.io/docs/">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a target="_blank" rel="noopener" href="https://hexo.io/docs/troubleshooting.html">troubleshooting</a> or you can ask me on <a target="_blank" rel="noopener" href="https://github.com/hexojs/hexo/issues">GitHub</a>.</p>
-<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo new <span class="string">&quot;My New Post&quot;</span></span><br></pre></td></tr></table></figure>
-
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/writing.html">Writing</a></p>
-<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/server.html">Server</a></p>
-<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/generating.html">Generating</a></p>
-<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/one-command-deployment.html">Deployment</a></p>
 
       
     </div>
