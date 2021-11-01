@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+<link rel="stylesheet" href="//fonts.googleapis.com/css?family=Noto Sans SC:300,300italic,400,400italic,700,700italic&display=swap&subset=latin,latin-ext">
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"jimzheng.com","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="其他系列博文  基于Abp的扩展模块实现 - 前言 基于Abp的扩展模块实现第1例 - 数据权限控制（开发） 基于Abp的扩展模块实现第1例 - 数据权限控制（测试） 基于Abp的扩展模块实现第2例 - 数据字段按需更新（开发） 基于Abp的扩展模块实现第2例 - 数据字段按需更新（测试）  背景通常在各种状态维护业务中，状态切换与处理逻辑会放在一起处理，具有较强耦合性。若使用订阅发布的中介者模式">
+<meta property="og:type" content="article">
+<meta property="og:title" content="基于Abp的扩展模块实现第3例 - 状态管理（开发）">
+<meta property="og:url" content="https://jimzheng.com/abp-extension-3/index.html">
+<meta property="og:site_name" content="Jim的博客">
+<meta property="og:description" content="其他系列博文  基于Abp的扩展模块实现 - 前言 基于Abp的扩展模块实现第1例 - 数据权限控制（开发） 基于Abp的扩展模块实现第1例 - 数据权限控制（测试） 基于Abp的扩展模块实现第2例 - 数据字段按需更新（开发） 基于Abp的扩展模块实现第2例 - 数据字段按需更新（测试）  背景通常在各种状态维护业务中，状态切换与处理逻辑会放在一起处理，具有较强耦合性。若使用订阅发布的中介者模式">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2021-11-01T14:30:42.000Z">
+<meta property="article:modified_time" content="2021-11-01T16:04:41.746Z">
+<meta property="article:author" content="Jim Zheng">
+<meta property="article:tag" content=".NET">
+<meta property="article:tag" content="ASP.NET Core">
+<meta property="article:tag" content="Abp">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://jimzheng.com/abp-extension-3/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>基于Abp的扩展模块实现第3例 - 状态管理（开发） | Jim的博客</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Jim的博客</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+        <li class="menu-item menu-item-schedule">
+
+    <a href="/schedule/" rel="section"><i class="fa fa-calendar fa-fw"></i>日程表</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://jimzheng.com/abp-extension-3/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Jim Zheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Jim的博客">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          基于Abp的扩展模块实现第3例 - 状态管理（开发）
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-11-01 22:30:42" itemprop="dateCreated datePublished" datetime="2021-11-01T22:30:42+08:00">2021-11-01</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2021-11-02 00:04:41" itemprop="dateModified" datetime="2021-11-02T00:04:41+08:00">2021-11-02</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Abp/" itemprop="url" rel="index"><span itemprop="name">Abp</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p><font size=4 style="font-weight:bold;">其他系列博文</font></p>
+<ul>
+<li><a href="/abp-extension-preface">基于Abp的扩展模块实现 - 前言</a></li>
+<li><a href="/abp-extension-1">基于Abp的扩展模块实现第1例 - 数据权限控制（开发）</a></li>
+<li><a href="/abp-extension-1-test">基于Abp的扩展模块实现第1例 - 数据权限控制（测试）</a></li>
+<li><a href="/abp-extension-2">基于Abp的扩展模块实现第2例 - 数据字段按需更新（开发）</a></li>
+<li><a href="/abp-extension-2-test">基于Abp的扩展模块实现第2例 - 数据字段按需更新（测试）</a></li>
+</ul>
+<h1 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h1><p>通常在各种状态维护业务中，状态切换与处理逻辑会放在一起处理，具有较强耦合性。若使用订阅发布的中介者模式，如MediatR等工具，能减少状态切换与处理动作之间的强耦合。但在一个有限状态机模型中，还有一层源状态与目标状态的对应关系，这层关系很难通过使用MediatR等通用工具直接达到解耦目的，尤其在更为复杂的状态机模型中更是如此。设想一个设备管理系统，要维护一个<strong>在线/异常/低电量/休眠/离线/禁用</strong>的二维状态模型，存在一对多的切换路径，且需要支持状态递归切换。我们试着建立一个基于Abp的抽象模块来提供针对性的中介者工具。</p>
+<h1 id="目标"><a href="#目标" class="headerlink" title="目标"></a>目标</h1><p>支持<strong>状态切换/处理</strong>及<strong>源状态/目标状态</strong>两层解耦，但不假设任何具体业务或持久化方式，以提供足够的抽象。</p>
+<h1 id="思路"><a href="#思路" class="headerlink" title="思路"></a>思路</h1><p>对于两个解耦层：</p>
+<ul>
+<li><strong>源状态/目标状态</strong> - 遵循Abp的<code>Settings</code>等模块风格，实现声明式自注册</li>
+<li><strong>状态切换/处理</strong> - 实现类中介者模式的订阅发布功能  </li>
+</ul>
+<p>另外并支持<strong>状态组</strong>声明，实现状态层级结构，以应对更复杂的业务模型</p>
+<h1 id="编码"><a href="#编码" class="headerlink" title="编码"></a>编码</h1><p>首先创建用以声明状态的<code>StateDefinition</code>类：</p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title">StateDefinition</span> : <span class="title">IState</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="built_in">string</span> Name &#123; <span class="keyword">get</span>; &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> StateType Type &#123; <span class="keyword">get</span>; &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> ILocalizableString DisplayName</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">get</span> =&gt; _displayName;</span><br><span class="line">        <span class="keyword">set</span> =&gt; _displayName = Check.NotNull(<span class="keyword">value</span>, <span class="keyword">nameof</span>(<span class="keyword">value</span>));</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">private</span> ILocalizableString _displayName;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">internal</span> <span class="title">List</span>&lt;<span class="title">StateTransitionDefinition</span>&gt; Transitions</span> &#123; <span class="keyword">get</span>; &#125; = <span class="keyword">new</span> List&lt;StateTransitionDefinition&gt;();</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="title">Dictionary</span>&lt;<span class="title">string</span>, <span class="title">object</span>&gt; Properties</span> &#123; <span class="keyword">get</span>; &#125; = <span class="keyword">new</span> Dictionary&lt;<span class="built_in">string</span>, <span class="built_in">object</span>&gt;();</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="built_in">object</span> <span class="keyword">this</span>[<span class="built_in">string</span> name]</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">get</span> =&gt; Properties.GetOrDefault(name);</span><br><span class="line">        <span class="keyword">set</span> =&gt; Properties[name] = <span class="keyword">value</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="title">StateDefinition</span>(<span class="params"></span></span></span><br><span class="line"><span class="params"><span class="function">        <span class="built_in">string</span> name,</span></span></span><br><span class="line"><span class="params"><span class="function">        ILocalizableString displayName = <span class="literal">null</span>,</span></span></span><br><span class="line"><span class="params"><span class="function">        StateType type = StateType.Intermediate</span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        Name = Check.NotNullOrWhiteSpace(name, <span class="keyword">nameof</span>(name));</span><br><span class="line">        DisplayName = displayName ?? <span class="keyword">new</span> FixedLocalizableString(name);</span><br><span class="line">        Type = type;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">virtual</span> StateTransitionDefinition <span class="title">On</span>(<span class="params"><span class="keyword">params</span> <span class="built_in">string</span>[] terms</span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        Check.NotNullOrEmpty(terms, <span class="keyword">nameof</span>(terms));</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> StateTransitionDefinition(<span class="keyword">this</span>, terms.Select(term =&gt; Check.NotNullOrWhiteSpace(term, <span class="keyword">nameof</span>(terms))));</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">virtual</span> StateDefinition <span class="title">ReverseOn</span>(<span class="params"><span class="keyword">params</span> <span class="built_in">string</span>[] terms</span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        Check.NotNullOrEmpty(terms, <span class="keyword">nameof</span>(terms));</span><br><span class="line">        <span class="keyword">var</span> lastTransition = Transitions.LastOrDefault();</span><br><span class="line">        <span class="keyword">if</span> (lastTransition == <span class="literal">null</span>)</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="keyword">throw</span> <span class="keyword">new</span> MyStatesException(<span class="string">&quot;No state transition to be reversed.&quot;</span>);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        lastTransition.TargetState.On(terms).TransitTo(<span class="keyword">this</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">this</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">virtual</span> StateDefinition <span class="title">WithProperty</span>(<span class="params"><span class="built_in">string</span> key, <span class="built_in">object</span> <span class="keyword">value</span></span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        Properties[key] = <span class="keyword">value</span>;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">this</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">virtual</span> <span class="built_in">bool</span> <span class="title">HasTargetState</span>(<span class="params">StateDefinition targetState</span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">return</span> Transitions.Any(transition =&gt; transition.TargetState.Equals(targetState));</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">override</span> <span class="built_in">bool</span> <span class="title">Equals</span>(<span class="params"><span class="built_in">object</span> obj</span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">if</span> (obj == <span class="literal">null</span>) <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">        <span class="keyword">if</span> (ReferenceEquals(<span class="keyword">this</span>, obj)) <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">        <span class="keyword">if</span> (!obj.GetType().IsAssignableTo&lt;StateDefinition&gt;()) <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> Name == obj.As&lt;StateDefinition&gt;()?.Name;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">override</span> <span class="built_in">int</span> <span class="title">GetHashCode</span>(<span class="params"></span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">return</span> Name.GetHashCode();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>博主给这个类封装了一些常用的帮助方法，并支持了本地化。其中最重要的是<code>Transitions</code>属性，它表明了状态与状态之间可能存在的一对多转换关系。转换关系声明类<code>StateTransitionDefinition</code>如下：</p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title">StateTransitionDefinition</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">public</span> StateDefinition SourceState &#123; <span class="keyword">get</span>; &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> StateDefinition TargetState &#123; <span class="keyword">get</span>; <span class="keyword">protected</span> <span class="keyword">set</span>; &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="title">List</span>&lt;<span class="title">string</span>&gt; Terms</span> &#123; <span class="keyword">get</span>; &#125; = <span class="keyword">new</span> List&lt;<span class="built_in">string</span>&gt;();</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">protected</span> <span class="keyword">internal</span> <span class="title">StateTransitionDefinition</span>(<span class="params">StateDefinition sourceState, IEnumerable&lt;<span class="built_in">string</span>&gt; terms</span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        AssertStateAllowTransitFrom(Check.NotNull(sourceState, <span class="keyword">nameof</span>(sourceState)));</span><br><span class="line"></span><br><span class="line">        SourceState = sourceState;</span><br><span class="line">        Terms = terms.ToList();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">virtual</span> StateDefinition <span class="title">TransitTo</span>(<span class="params">StateDefinition targetState</span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        AssertStateAllowTransitTo(Check.NotNull(targetState, <span class="keyword">nameof</span>(targetState)));</span><br><span class="line"></span><br><span class="line">        TargetState = targetState;</span><br><span class="line">        SourceState.Transitions.Add(<span class="keyword">this</span>);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> SourceState;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">protected</span> <span class="keyword">virtual</span> <span class="keyword">void</span> <span class="title">AssertStateAllowTransitFrom</span>(<span class="params">StateDefinition sourceState</span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">if</span> (sourceState.Type.HasFlag(StateType.Final))</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="keyword">throw</span> <span class="keyword">new</span> MyStatesException(<span class="string">&quot;Final state cannot be transited from.&quot;</span>, sourceState.Name);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">protected</span> <span class="keyword">virtual</span> <span class="keyword">void</span> <span class="title">AssertStateAllowTransitTo</span>(<span class="params">StateDefinition targetState</span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">if</span> (targetState.Type.HasFlag(StateType.Initial))</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="keyword">throw</span> <span class="keyword">new</span> MyStatesException(<span class="string">&quot;Initial state cannot be transited to.&quot;</span>, targetState.Name);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (Terms.IsNullOrEmpty())</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="keyword">throw</span> <span class="keyword">new</span> MyStatesException(<span class="string">&quot;State transition must have terms.&quot;</span>, targetState.Name);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (SourceState.HasTargetState(targetState))</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="keyword">throw</span> <span class="keyword">new</span> MyStatesException(<span class="string">&quot;Source state already has a same target state.&quot;</span>, targetState.Name);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (SourceState.Transitions</span><br><span class="line">            .SelectMany(transition =&gt; transition.Terms)</span><br><span class="line">            .Intersect(Terms)</span><br><span class="line">            .Any())</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="keyword">throw</span> <span class="keyword">new</span> MyStatesException(<span class="string">&quot;Source state cannot have multiple transitions with same terms&quot;</span>, targetState.Name);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">protected</span> <span class="keyword">virtual</span> <span class="keyword">void</span> <span class="title">AssertTransitionAllowReverse</span>(<span class="params"></span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">if</span> (SourceState == <span class="literal">null</span> || TargetState == <span class="literal">null</span>)</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="keyword">throw</span> <span class="keyword">new</span> MyStatesException(<span class="string">$&quot;<span class="subst">&#123;<span class="keyword">nameof</span>(SourceState)&#125;</span> and <span class="subst">&#123;<span class="keyword">nameof</span>(TargetState)&#125;</span> should not be null when reversing.&quot;</span>);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        AssertStateAllowTransitFrom(TargetState);</span><br><span class="line">        AssertStateAllowTransitTo(SourceState);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>其次，创建<strong>状态组</strong>声明类<code>StateGroupDefinition</code>:</p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br><span class="line">128</span><br><span class="line">129</span><br><span class="line">130</span><br><span class="line">131</span><br><span class="line">132</span><br><span class="line">133</span><br><span class="line">134</span><br><span class="line">135</span><br><span class="line">136</span><br><span class="line">137</span><br><span class="line">138</span><br><span class="line">139</span><br><span class="line">140</span><br><span class="line">141</span><br><span class="line">142</span><br><span class="line">143</span><br><span class="line">144</span><br><span class="line">145</span><br><span class="line">146</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title">StateGroupDefinition</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="built_in">string</span> Name &#123; <span class="keyword">get</span>; &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> StateGroupDefinition Parent &#123; <span class="keyword">get</span>; <span class="keyword">private</span> <span class="keyword">set</span>; &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> ILocalizableString DisplayName</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">get</span> =&gt; _displayName;</span><br><span class="line">        <span class="keyword">set</span> =&gt; _displayName = Check.NotNull(<span class="keyword">value</span>, <span class="keyword">nameof</span>(<span class="keyword">value</span>));</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">private</span> ILocalizableString _displayName;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> IReadOnlyList&lt;StateDefinition&gt; States =&gt; _states.ToImmutableList();</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">readonly</span> List&lt;StateDefinition&gt; _states = <span class="keyword">new</span>();</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> IReadOnlyList&lt;StateGroupDefinition&gt; Groups =&gt; _groups.ToImmutableList();</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">readonly</span> List&lt;StateGroupDefinition&gt; _groups = <span class="keyword">new</span>();</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="title">Dictionary</span>&lt;<span class="title">string</span>, <span class="title">object</span>&gt; Properties</span> &#123; <span class="keyword">get</span>; &#125; = <span class="keyword">new</span> Dictionary&lt;<span class="built_in">string</span>, <span class="built_in">object</span>&gt;();</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="built_in">object</span> <span class="keyword">this</span>[<span class="built_in">string</span> name]</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">get</span> =&gt; Properties.GetOrDefault(name);</span><br><span class="line">        <span class="keyword">set</span> =&gt; Properties[name] = <span class="keyword">value</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">protected</span> <span class="keyword">internal</span> <span class="title">StateGroupDefinition</span>(<span class="params"></span></span></span><br><span class="line"><span class="params"><span class="function">        <span class="built_in">string</span> name,</span></span></span><br><span class="line"><span class="params"><span class="function">        ILocalizableString displayName = <span class="literal">null</span>,</span></span></span><br><span class="line"><span class="params"><span class="function">        StateGroupDefinition parent = <span class="literal">null</span></span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        Name = Check.NotNullOrWhiteSpace(name, <span class="keyword">nameof</span>(name));</span><br><span class="line">        DisplayName = displayName ?? <span class="keyword">new</span> FixedLocalizableString(Name);</span><br><span class="line">        Parent = parent;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">virtual</span> StateGroupDefinition <span class="title">AddGroup</span>(<span class="params"></span></span></span><br><span class="line"><span class="params"><span class="function">        <span class="built_in">string</span> name,</span></span></span><br><span class="line"><span class="params"><span class="function">        ILocalizableString displayName = <span class="literal">null</span></span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">if</span> (Name == name || _groups.Any(<span class="keyword">group</span> =&gt; <span class="keyword">group</span>.Name == name))</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="keyword">throw</span> <span class="keyword">new</span> MyStatesException(<span class="string">$&quot;There is already an existing state group definition with given name: <span class="subst">&#123;name&#125;</span>&quot;</span>, stateGroupName: name);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">var</span> <span class="keyword">group</span> = <span class="keyword">new</span> StateGroupDefinition(name, displayName, <span class="keyword">this</span>);</span><br><span class="line"></span><br><span class="line">        _groups.Add(<span class="keyword">group</span>);</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">group</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">virtual</span> StateDefinition <span class="title">AddState</span>(<span class="params"></span></span></span><br><span class="line"><span class="params"><span class="function">        <span class="built_in">string</span> name,</span></span></span><br><span class="line"><span class="params"><span class="function">        ILocalizableString displayName = <span class="literal">null</span>,</span></span></span><br><span class="line"><span class="params"><span class="function">        StateType type = StateType.Intermediate</span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">var</span> state = <span class="keyword">new</span> StateDefinition(name, displayName, type);</span><br><span class="line">        <span class="keyword">return</span> AddState(state);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">virtual</span> StateDefinition <span class="title">AddState</span>(<span class="params">StateDefinition state</span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">if</span> (_states.Any(s =&gt; s.Name == Check.NotNull(state, <span class="keyword">nameof</span>(state)).Name))</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="keyword">throw</span> <span class="keyword">new</span> MyStatesException(<span class="string">$&quot;There is already an existing state definition with given name: <span class="subst">&#123;state.Name&#125;</span>&quot;</span>, state.Name, Name);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        _states.Add(state);</span><br><span class="line">        <span class="keyword">return</span> state;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">virtual</span> StateGroupDefinition <span class="title">FindGroupRecursively</span>(<span class="params"><span class="built_in">string</span> name, <span class="built_in">bool</span> includeSelf = <span class="literal">true</span></span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        Check.NotNullOrWhiteSpace(name, <span class="keyword">nameof</span>(name));</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (includeSelf &amp;&amp; Name == name)</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="keyword">this</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">foreach</span> (<span class="keyword">var</span> childGroup <span class="keyword">in</span> _groups)</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="keyword">var</span> <span class="keyword">group</span> = EnumerateGroupRecursively(childGroup).FirstOrDefault(g =&gt; g.Name == name);</span><br><span class="line">            <span class="keyword">if</span> (<span class="keyword">group</span> != <span class="literal">null</span>)</span><br><span class="line">            &#123;</span><br><span class="line">                <span class="keyword">return</span> <span class="keyword">group</span>;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> <span class="literal">null</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">virtual</span> List&lt;StateGroupDefinition&gt; <span class="title">GetAllGroups</span>(<span class="params"><span class="built_in">bool</span> includeSelf = <span class="literal">false</span></span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">var</span> groups = <span class="keyword">new</span> List&lt;StateGroupDefinition&gt;();</span><br><span class="line"></span><br><span class="line">        <span class="keyword">foreach</span> (<span class="keyword">var</span> <span class="keyword">group</span> <span class="keyword">in</span> _groups)</span><br><span class="line">        &#123;</span><br><span class="line">            AddGroupToListRecursively(groups, <span class="keyword">group</span>);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (includeSelf)</span><br><span class="line">        &#123;</span><br><span class="line">            groups.Insert(<span class="number">0</span>, <span class="keyword">this</span>);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> groups;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">virtual</span> List&lt;StateDefinition&gt; <span class="title">GetAllStates</span>(<span class="params"></span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">var</span> allGroups = GetAllGroups(<span class="literal">true</span>);</span><br><span class="line">        <span class="keyword">return</span> allGroups.SelectMany(<span class="keyword">group</span> =&gt; <span class="keyword">group</span>.States).ToList();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">virtual</span> StateTransitionDefinitionCollection <span class="title">On</span>(<span class="params"><span class="keyword">params</span> <span class="built_in">string</span>[] terms</span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        Check.NotNullOrEmpty(terms, <span class="keyword">nameof</span>(terms));</span><br><span class="line">        <span class="keyword">var</span> allStates = GetAllStates();</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">new</span> StateTransitionDefinitionCollection(allStates.Select(state =&gt; state.On(terms)).ToList());</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title">AddGroupToListRecursively</span>(<span class="params">List&lt;StateGroupDefinition&gt; groups, StateGroupDefinition <span class="keyword">group</span></span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        groups.Add(<span class="keyword">group</span>);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">foreach</span> (<span class="keyword">var</span> child <span class="keyword">in</span> <span class="keyword">group</span>.Groups)</span><br><span class="line">        &#123;</span><br><span class="line">            AddGroupToListRecursively(groups, child);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">private</span> IEnumerable&lt;StateGroupDefinition&gt; <span class="title">EnumerateGroupRecursively</span>(<span class="params">StateGroupDefinition <span class="keyword">group</span></span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">yield</span> <span class="keyword">return</span> <span class="keyword">group</span>;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">foreach</span> (<span class="keyword">var</span> innerGroup <span class="keyword">in</span> <span class="keyword">group</span>._groups)</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="keyword">foreach</span> (<span class="function"><span class="keyword">var</span> recurseGroup <span class="keyword">in</span> <span class="title">EnumerateGroupRecursively</span>(<span class="params">innerGroup</span>))</span></span><br><span class="line">            &#123;</span><br><span class="line">                <span class="keyword">yield</span> <span class="keyword">return</span> recurseGroup;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>博主按照Abp的代码风格，创建一个<code>StateDefinitionProvider</code>类与一个<code>StateDefinitionManager</code>类来支持使用上面创建的类进行声明配置，及启动时的配置载入：</p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">abstract</span> <span class="keyword">class</span> <span class="title">StateDefinitionProvider</span> : <span class="title">IStateDefinitionProvider</span>, <span class="title">ITransientDependency</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">abstract</span> <span class="keyword">void</span> <span class="title">Define</span>(<span class="params">IStateDefinitionContext context</span>)</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title">StateDefinitionManager</span> : <span class="title">IStateDefinitionManager</span>, <span class="title">ISingletonDependency</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">protected</span> Lazy&lt;IDictionary&lt;<span class="built_in">string</span>, StateGroupDefinition&gt;&gt; StateGroupDefinitions &#123; <span class="keyword">get</span>; &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">protected</span> MyStateOptions Options &#123; <span class="keyword">get</span>; &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">protected</span> IServiceProvider ServiceProvider &#123; <span class="keyword">get</span>; &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="title">StateDefinitionManager</span>(<span class="params"></span></span></span><br><span class="line"><span class="params"><span class="function">        IOptions&lt;MyStateOptions&gt; options,</span></span></span><br><span class="line"><span class="params"><span class="function">        IServiceProvider serviceProvider</span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        ServiceProvider = serviceProvider;</span><br><span class="line">        Options = options.Value;</span><br><span class="line"></span><br><span class="line">        StateGroupDefinitions = <span class="keyword">new</span> Lazy&lt;IDictionary&lt;<span class="built_in">string</span>, StateGroupDefinition&gt;&gt;(CreateStateDefinitions, <span class="literal">true</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    ...</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">protected</span> <span class="keyword">virtual</span> IDictionary&lt;<span class="built_in">string</span>, StateGroupDefinition&gt; <span class="title">CreateStateDefinitions</span>(<span class="params"></span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">var</span> states = <span class="keyword">new</span> Dictionary&lt;<span class="built_in">string</span>, StateGroupDefinition&gt;();</span><br><span class="line"></span><br><span class="line">        <span class="keyword">using</span> (<span class="keyword">var</span> scope = ServiceProvider.CreateScope())</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="keyword">var</span> providers = Options</span><br><span class="line">                .DefinitionProviders</span><br><span class="line">                .Select(p =&gt; scope.ServiceProvider.GetRequiredService(p) <span class="keyword">as</span> IStateDefinitionProvider)</span><br><span class="line">                .ToList();</span><br><span class="line"></span><br><span class="line">            <span class="keyword">foreach</span> (<span class="keyword">var</span> provider <span class="keyword">in</span> providers)</span><br><span class="line">            &#123;</span><br><span class="line">                provider.Define(<span class="keyword">new</span> StateDefinitionContext(states, scope.ServiceProvider));</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> states;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>接下来进行抽象。整个模块中最核心的是两个抽象：</p>
+<ul>
+<li><code>IStateTransitionHandler</code> - 放置状态切换处理逻辑，对应<strong>状态切换/处理</strong>层解耦</li>
+<li><code>IStateTransitionNotifier</code> - 放置状态切换决策逻辑，对应<strong>源状态/目标状态</strong>层解耦</li>
+</ul>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">interface</span> <span class="title">IStateTransitionHandler</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="function">Task <span class="title">HandleAsync</span>(<span class="params">StateTransitionContext context</span>)</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">interface</span> <span class="title">IStateTransitionNotifier</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="function">Task <span class="title">NotifyAsync</span>(<span class="params"></span></span></span><br><span class="line"><span class="params"><span class="function">        <span class="built_in">string</span> groupName,</span></span></span><br><span class="line"><span class="params"><span class="function">        <span class="built_in">string</span> term,</span></span></span><br><span class="line"><span class="params"><span class="function">        Action&lt;StateTransitionContext&gt; contextAction = <span class="literal">null</span>,</span></span></span><br><span class="line"><span class="params"><span class="function">        <span class="built_in">bool</span> recurse = <span class="literal">true</span></span>)</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>对于<code>IStateTransitionHandler</code>我们可完全交由用户代码实现，而对于<code>IStateTransitionNotifier</code>，博主提供了一个默认实现<code>DefaultStateTransitionNotifier</code>：</p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title">DefaultStateTransitionNotifier</span> : <span class="title">IStateTransitionNotifier</span>, <span class="title">ITransientDependency</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">public</span> ILogger&lt;DefaultStateTransitionNotifier&gt; Logger &#123; <span class="keyword">get</span>; <span class="keyword">set</span>; &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">protected</span> IServiceProvider ServiceProvider &#123; <span class="keyword">get</span>; &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">protected</span> IStateDefinitionManager DefinationManager &#123; <span class="keyword">get</span>; &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">protected</span> IStateTransitionHandler TransitionHandler &#123; <span class="keyword">get</span>; &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">protected</span> MyStateOptions Options &#123; <span class="keyword">get</span>; &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="title">DefaultStateTransitionNotifier</span>(<span class="params"></span></span></span><br><span class="line"><span class="params"><span class="function">        IServiceProvider serviceProvider,</span></span></span><br><span class="line"><span class="params"><span class="function">        IStateDefinitionManager definationManager,</span></span></span><br><span class="line"><span class="params"><span class="function">        IStateTransitionHandler transitionHandler,</span></span></span><br><span class="line"><span class="params"><span class="function">        IOptions&lt;MyStateOptions&gt; options</span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        ServiceProvider = serviceProvider;</span><br><span class="line">        DefinationManager = definationManager;</span><br><span class="line">        TransitionHandler = transitionHandler;</span><br><span class="line">        Options = options.Value;</span><br><span class="line"></span><br><span class="line">        Logger = NullLogger&lt;DefaultStateTransitionNotifier&gt;.Instance;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">virtual</span> <span class="keyword">async</span> Task <span class="title">NotifyAsync</span>(<span class="params"></span></span></span><br><span class="line"><span class="params"><span class="function">        <span class="built_in">string</span> groupName,</span></span></span><br><span class="line"><span class="params"><span class="function">        <span class="built_in">string</span> term,</span></span></span><br><span class="line"><span class="params"><span class="function">        Action&lt;StateTransitionContext&gt; contextAction = <span class="literal">null</span>,</span></span></span><br><span class="line"><span class="params"><span class="function">        <span class="built_in">bool</span> recurse = <span class="literal">true</span></span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        Check.NotNullOrWhiteSpace(groupName, <span class="keyword">nameof</span>(groupName));</span><br><span class="line">        Check.NotNullOrWhiteSpace(term, <span class="keyword">nameof</span>(term));</span><br><span class="line"></span><br><span class="line">        <span class="keyword">var</span> <span class="keyword">group</span> = DefinationManager.GetGroupRecursively(groupName);</span><br><span class="line">        <span class="keyword">var</span> transitions = GetTransitionsToHandle(<span class="keyword">group</span>, term);</span><br><span class="line">        <span class="keyword">var</span> context = <span class="keyword">new</span> StateTransitionContext(groupName, term, transitions, recurse);</span><br><span class="line">        contextAction?.Invoke(context);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">using</span> <span class="keyword">var</span> scope = ServiceProvider.CreateScope();</span><br><span class="line"></span><br><span class="line">        <span class="keyword">var</span> handlers = Options</span><br><span class="line">            .TransitionHandlers</span><br><span class="line">            .Where(handler =&gt;</span><br><span class="line">            &#123;</span><br><span class="line">                <span class="keyword">var</span> handleGroupName = HandleStateAttribute.GetHandleGroupName(handler);</span><br><span class="line">                <span class="keyword">return</span> handleGroupName.IsNullOrEmpty() || DefinationManager.IsGroupBelongTo(groupName, handleGroupName);</span><br><span class="line">            &#125;)</span><br><span class="line">            .Select(p =&gt; scope.ServiceProvider.GetRequiredService(p) <span class="keyword">as</span> IStateTransitionHandler)</span><br><span class="line">            .ToList();</span><br><span class="line"></span><br><span class="line">        <span class="keyword">foreach</span> (<span class="keyword">var</span> handler <span class="keyword">in</span> handlers)</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="keyword">await</span> handler.HandleAsync(context);</span><br><span class="line"></span><br><span class="line">            <span class="keyword">if</span> (!context.HandlerContext.Any(handlerContext =&gt; !handlerContext.Value))</span><br><span class="line">            &#123;</span><br><span class="line">                <span class="keyword">break</span>;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (!context.HandlerContext.Any(handlerContext =&gt; handlerContext.Value))</span><br><span class="line">        &#123;</span><br><span class="line">            Logger.LogWarning(<span class="string">&quot;State transition notification not handled by any of the registered handlers, context: &#123;Context&#125;&quot;</span>, context);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">protected</span> <span class="keyword">virtual</span> IEnumerable&lt;StateTransitionDefinition&gt; <span class="title">GetTransitionsToHandle</span>(<span class="params">StateGroupDefinition <span class="keyword">group</span>, <span class="built_in">string</span> term</span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">group</span></span><br><span class="line">            .GetAllStates()</span><br><span class="line">            .SelectMany(state =&gt; state.Transitions)</span><br><span class="line">            .Where(transition =&gt; transition.Terms.Any(t =&gt; t == term));</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>最后按照惯例创建配置类及模块类，对服务发现及自注册进行支持：</p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title">MyStateOptions</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="title">ITypeList</span>&lt;<span class="title">IStateDefinitionProvider</span>&gt; DefinitionProviders</span> &#123; <span class="keyword">get</span>; &#125; = <span class="keyword">new</span> TypeList&lt;IStateDefinitionProvider&gt;();</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="title">ITypeList</span>&lt;<span class="title">IStateTransitionHandler</span>&gt; TransitionHandlers</span> &#123; <span class="keyword">get</span>; &#125; = <span class="keyword">new</span> TypeList&lt;IStateTransitionHandler&gt;();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line">[<span class="meta">DependsOn(typeof(AbpLocalizationModule))</span>]</span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title">MyStatesModule</span> : <span class="title">AbpModule</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">override</span> <span class="keyword">void</span> <span class="title">PreConfigureServices</span>(<span class="params">ServiceConfigurationContext context</span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        AutoAddDefinitionProviders(context.Services);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">AutoAddDefinitionProviders</span>(<span class="params">IServiceCollection services</span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">var</span> definitionProviders = <span class="keyword">new</span> List&lt;Type&gt;();</span><br><span class="line">        <span class="keyword">var</span> transitionHandlers = <span class="keyword">new</span> List&lt;Type&gt;();</span><br><span class="line"></span><br><span class="line">        services.OnRegistred(context =&gt;</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="keyword">if</span> (<span class="keyword">typeof</span>(IStateDefinitionProvider).IsAssignableFrom(context.ImplementationType))</span><br><span class="line">            &#123;</span><br><span class="line">                definitionProviders.Add(context.ImplementationType);</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            <span class="keyword">if</span> (<span class="keyword">typeof</span>(IStateTransitionHandler).IsAssignableFrom(context.ImplementationType))</span><br><span class="line">            &#123;</span><br><span class="line">                transitionHandlers.Add(context.ImplementationType);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;);</span><br><span class="line"></span><br><span class="line">        services.Configure&lt;MyStateOptions&gt;(options =&gt;</span><br><span class="line">        &#123;</span><br><span class="line">            options.DefinitionProviders.AddIfNotContains(definitionProviders);</span><br><span class="line">            options.TransitionHandlers.AddIfNotContains(transitionHandlers);</span><br><span class="line">        &#125;);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>至此，基于Abp的状态管理功能已开发完成。在下一篇博文中，博主会对本文实现的功能编写测试。</p>
+
+    </div>
+
+    
+    
+    
+
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/NET/" rel="tag"># .NET</a>
+              <a href="/tags/ASP-NET-Core/" rel="tag"># ASP.NET Core</a>
+              <a href="/tags/Abp/" rel="tag"># Abp</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/abp-extension-2-test/" rel="prev" title="基于Abp的扩展模块实现第2例 - 数据字段按需更新（测试）">
+      <i class="fa fa-chevron-left"></i> 基于Abp的扩展模块实现第2例 - 数据字段按需更新（测试）
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%83%8C%E6%99%AF"><span class="nav-number">1.</span> <span class="nav-text">背景</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%9B%AE%E6%A0%87"><span class="nav-number">2.</span> <span class="nav-text">目标</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%80%9D%E8%B7%AF"><span class="nav-number">3.</span> <span class="nav-text">思路</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%BC%96%E7%A0%81"><span class="nav-number">4.</span> <span class="nav-text">编码</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Jim Zheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">6</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">1</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+        <span class="site-state-item-count">3</span>
+        <span class="site-state-item-name">标签</span>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/jimmidier" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;jimmidier" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:jimzheng@ssw.com.au" title="E-Mail → mailto:jimzheng@ssw.com.au" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  Copyright &copy; 
+  <span itemprop="copyrightYear">2021</span>
+  <span class="author" itemprop="copyrightHolder">Jim Zheng</span> - All Rights Reserved.
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://pisces.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
