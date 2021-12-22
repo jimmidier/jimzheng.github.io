@@ -20,15 +20,15 @@
     var CONFIG = {"hostname":"jimzheng.com","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
   </script>
 
-  <meta name="description" content="其他系列博文  基于Abp的扩展模块实现 - 前言 基于Abp的扩展模块实现第1例 - 数据权限控制（测试） 基于Abp的扩展模块实现第2例 - 数据字段按需更新（开发） 基于Abp的扩展模块实现第2例 - 数据字段按需更新（测试） 基于Abp的扩展模块实现第3例 - 状态管理（开发）  背景在大多数企业应用或系统后台中，或多或少会涉及权限系统。一般来说，权限系统可分为操作权限、数据权限两类。操作">
+  <meta name="description" content="其他系列博文  基于Abp的扩展模块实现 - 前言 基于Abp的扩展模块实现第1例 - 数据权限控制（测试） 基于Abp的扩展模块实现第2例 - 数据字段按需更新（开发） 基于Abp的扩展模块实现第2例 - 数据字段按需更新（测试） 基于Abp的扩展模块实现第3例 - 状态管理（开发） 基于Abp的扩展模块实现第3例 - 状态管理（测试）  背景在大多数企业应用或系统后台中，或多或少会涉及权限系统">
 <meta property="og:type" content="article">
 <meta property="og:title" content="基于Abp的扩展模块实现第1例 - 数据权限控制（开发）">
 <meta property="og:url" content="https://jimzheng.com/abp-extension-1/index.html">
 <meta property="og:site_name" content="Jim的博客">
-<meta property="og:description" content="其他系列博文  基于Abp的扩展模块实现 - 前言 基于Abp的扩展模块实现第1例 - 数据权限控制（测试） 基于Abp的扩展模块实现第2例 - 数据字段按需更新（开发） 基于Abp的扩展模块实现第2例 - 数据字段按需更新（测试） 基于Abp的扩展模块实现第3例 - 状态管理（开发）  背景在大多数企业应用或系统后台中，或多或少会涉及权限系统。一般来说，权限系统可分为操作权限、数据权限两类。操作">
+<meta property="og:description" content="其他系列博文  基于Abp的扩展模块实现 - 前言 基于Abp的扩展模块实现第1例 - 数据权限控制（测试） 基于Abp的扩展模块实现第2例 - 数据字段按需更新（开发） 基于Abp的扩展模块实现第2例 - 数据字段按需更新（测试） 基于Abp的扩展模块实现第3例 - 状态管理（开发） 基于Abp的扩展模块实现第3例 - 状态管理（测试）  背景在大多数企业应用或系统后台中，或多或少会涉及权限系统">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2021-06-26T08:28:03.000Z">
-<meta property="article:modified_time" content="2021-11-01T14:33:34.938Z">
+<meta property="article:modified_time" content="2021-12-22T15:54:38.794Z">
 <meta property="article:author" content="Jim Zheng">
 <meta property="article:tag" content=".NET">
 <meta property="article:tag" content="ASP.NET Core">
@@ -193,7 +193,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2021-11-01 22:33:34" itemprop="dateModified" datetime="2021-11-01T22:33:34+08:00">2021-11-01</time>
+                <time title="修改时间：2021-12-22 23:54:38" itemprop="dateModified" datetime="2021-12-22T23:54:38+08:00">2021-12-22</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -223,6 +223,7 @@
 <li><a href="/abp-extension-2">基于Abp的扩展模块实现第2例 - 数据字段按需更新（开发）</a></li>
 <li><a href="/abp-extension-2-test">基于Abp的扩展模块实现第2例 - 数据字段按需更新（测试）</a></li>
 <li><a href="/abp-extension-3">基于Abp的扩展模块实现第3例 - 状态管理（开发）</a></li>
+<li><a href="/abp-extension-3-test">基于Abp的扩展模块实现第3例 - 状态管理（测试）</a></li>
 </ul>
 <h1 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h1><p>在大多数企业应用或系统后台中，或多或少会涉及权限系统。一般来说，权限系统可分为操作权限、数据权限两类。<br>操作权限例如菜单权限和按钮权限，可通过用户权限点进行控制，在.NET平台下的常用做法是利用<code>Identity</code>框架或结合前端<code>ACL</code>进行实现。而数据权限作为系统中更为核心的部分，常常隐含用户与数据的层级关系，相比简单的权限点控制而言多了一个变量，导致设计与实现更为困难。<br>不管是复杂如<strong>公司-部门-岗位-项目-用户</strong>，或是简单的<strong>角色-用户</strong>，用户在系统中可访问的数据不仅受权限点影响，还受用户所处层级结构的位置影响。开发过程中，常用做法是在业务代码中实现特定的数据筛选逻辑，例如项目所属用户只能查看该项目下的数据。而这种做法往往只适用于某个系统，若另一个系统层次结构稍有改变则须重新实现。</p>
 <h1 id="目标"><a href="#目标" class="headerlink" title="目标"></a>目标</h1><p>开发一个可集成在Abp中的通用数据权限控制模块。</p>
@@ -394,7 +395,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">6</span>
+          <span class="site-state-item-count">7</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
