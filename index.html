@@ -155,6 +155,85 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://jimzheng.com/powershell-1/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Jim Zheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Jim的博客">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/powershell-1/" class="post-title-link" itemprop="url">记录一个简单但很有用的Powershell脚本</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2022-03-06 19:58:03 / 修改时间：20:29:39" itemprop="dateCreated datePublished" datetime="2022-03-06T19:58:03+08:00">2022-03-06</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Powershell/" itemprop="url" rel="index"><span itemprop="name">Powershell</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h1 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h1><p>在开发一个大型.Net系统时，可能会需要根据项目类型拆分为多个.sln解决方案，以避免单个解决方案包含数十个项目带来的开发和管理上的困难，典型如系统包含底层库和下游应用的复杂系统。但是Visual Studio对跨解决方案的项目引用场景支持并不是特别完善，我们可选择使用脚本来对整个项目进行完整的编译操作。</p>
+<h1 id="思路"><a href="#思路" class="headerlink" title="思路"></a>思路</h1><p>借鉴Abp框架源码中的脚本文件，我们可以使用Powershell命令，遍历所有.sln解决方案，并对每个解决方案调用dotnet build。</p>
+<h1 id="编码"><a href="#编码" class="headerlink" title="编码"></a>编码</h1><figure class="highlight powershell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable">$solutionPaths</span> = <span class="selector-tag">@</span>(</span><br><span class="line">    &#123;你的解决方案文件路径数组&#125;</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="keyword">foreach</span> (<span class="variable">$solutionPath</span> <span class="keyword">in</span> <span class="variable">$solutionPaths</span>) &#123;    </span><br><span class="line">    <span class="variable">$solutionAbsPath</span> = (<span class="built_in">Join-Path</span> <span class="variable">$rootFolder</span> <span class="variable">$solutionPath</span>)</span><br><span class="line">    <span class="built_in">Set-Location</span> <span class="variable">$solutionAbsPath</span></span><br><span class="line">    dotnet build</span><br><span class="line">    <span class="keyword">if</span> (<span class="operator">-Not</span> <span class="variable">$</span>?) &#123;</span><br><span class="line">        <span class="built_in">Write-Host</span> (<span class="string">&quot;Build failed for the solution: &quot;</span> + <span class="variable">$solutionPath</span>)</span><br><span class="line">        <span class="built_in">Set-Location</span> <span class="variable">$rootFolder</span></span><br><span class="line">        <span class="keyword">exit</span> <span class="variable">$LASTEXITCODE</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="built_in">Set-Location</span> <span class="variable">$rootFolder</span></span><br></pre></td></tr></table></figure>
+
+<p>为了更好的管理，还可以建立一个单独的Powershell存放各解决方案的路径字符串：</p>
+<p>(build-all.ps1)</p>
+<figure class="highlight powershell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable">$full</span> = <span class="variable">$args</span>[<span class="number">0</span>] </span><br><span class="line"></span><br><span class="line">. <span class="string">&quot;.\common.ps1&quot;</span> <span class="variable">$full</span>   </span><br><span class="line"></span><br><span class="line"><span class="built_in">Write-Host</span> <span class="variable">$solutionPaths</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">foreach</span> (<span class="variable">$solutionPath</span> <span class="keyword">in</span> <span class="variable">$solutionPaths</span>) &#123;    </span><br><span class="line">    <span class="variable">$solutionAbsPath</span> = (<span class="built_in">Join-Path</span> <span class="variable">$rootFolder</span> <span class="variable">$solutionPath</span>)</span><br><span class="line">    <span class="built_in">Set-Location</span> <span class="variable">$solutionAbsPath</span></span><br><span class="line">    dotnet build</span><br><span class="line">    <span class="keyword">if</span> (<span class="operator">-Not</span> <span class="variable">$</span>?) &#123;</span><br><span class="line">        <span class="built_in">Write-Host</span> (<span class="string">&quot;Build failed for the solution: &quot;</span> + <span class="variable">$solutionPath</span>)</span><br><span class="line">        <span class="built_in">Set-Location</span> <span class="variable">$rootFolder</span></span><br><span class="line">        <span class="keyword">exit</span> <span class="variable">$LASTEXITCODE</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="built_in">Set-Location</span> <span class="variable">$rootFolder</span></span><br></pre></td></tr></table></figure>
+
+<p>(common.ps1)</p>
+<figure class="highlight powershell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable">$full</span> = <span class="variable">$args</span>[<span class="number">0</span>]</span><br><span class="line"></span><br><span class="line"><span class="variable">$rootFolder</span> = (<span class="built_in">Get-Item</span> <span class="literal">-Path</span> <span class="string">&quot;./&quot;</span> <span class="literal">-Verbose</span>).FullName</span><br><span class="line"></span><br><span class="line"><span class="variable">$solutionPaths</span> = <span class="selector-tag">@</span>(</span><br><span class="line">    &#123;你的解决方案文件路径数组&#125;</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+      
+    </div>
+
+    
+    
+    
+
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://jimzheng.com/abp-extension-3-test/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1049,18 +1128,18 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">7</span>
+          <span class="site-state-item-count">8</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
             <a href="/categories/">
           
-        <span class="site-state-item-count">1</span>
+        <span class="site-state-item-count">2</span>
         <span class="site-state-item-name">分类</span></a>
       </div>
       <div class="site-state-item site-state-tags">
-        <span class="site-state-item-count">3</span>
+        <span class="site-state-item-count">4</span>
         <span class="site-state-item-name">标签</span>
       </div>
   </nav>
@@ -1094,8 +1173,8 @@
 
 <div class="copyright">
   
-  Copyright &copy; 
-  <span itemprop="copyrightYear">2021</span>
+  Copyright &copy; 2021 – 
+  <span itemprop="copyrightYear">2022</span>
   <span class="author" itemprop="copyrightHolder">Jim Zheng</span> - All Rights Reserved.
 </div>
   <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://pisces.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
