@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+<link rel="stylesheet" href="//fonts.googleapis.com/css?family=Noto Sans SC:300,300italic,400,400italic,700,700italic&display=swap&subset=latin,latin-ext">
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"jimzheng.com","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="背景使用CI&#x2F;CD及docker容器部署一个简单的web应用时，利用docker context可以简单快速地进行远程镜像部署，而无需任何镜像托管服务进行发布和拉取。本篇博文中的例子将以Nginx作为反向代理服务器。 思路配置好生产服务器的SSH连接后，即可利用docker context进行远程容器部署。其中前端应用由于只是静态文件，在GitHub Action中编译后直接上传至远程服务器。以下">
+<meta property="og:type" content="article">
+<meta property="og:title" content="GitHub Actions+docker context CLI+Nginx部署前后端分离应用">
+<meta property="og:url" content="https://jimzheng.com/powershell-2/index.html">
+<meta property="og:site_name" content="Jim的博客">
+<meta property="og:description" content="背景使用CI&#x2F;CD及docker容器部署一个简单的web应用时，利用docker context可以简单快速地进行远程镜像部署，而无需任何镜像托管服务进行发布和拉取。本篇博文中的例子将以Nginx作为反向代理服务器。 思路配置好生产服务器的SSH连接后，即可利用docker context进行远程容器部署。其中前端应用由于只是静态文件，在GitHub Action中编译后直接上传至远程服务器。以下">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2022-06-12T10:11:06.000Z">
+<meta property="article:modified_time" content="2022-06-12T11:23:11.865Z">
+<meta property="article:author" content="Jim Zheng">
+<meta property="article:tag" content="DevOps">
+<meta property="article:tag" content="GitHub Actions">
+<meta property="article:tag" content="docker">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://jimzheng.com/powershell-2/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>GitHub Actions+docker context CLI+Nginx部署前后端分离应用 | Jim的博客</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Jim的博客</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+        <li class="menu-item menu-item-schedule">
+
+    <a href="/schedule/" rel="section"><i class="fa fa-calendar fa-fw"></i>日程表</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://jimzheng.com/powershell-2/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Jim Zheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Jim的博客">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          GitHub Actions+docker context CLI+Nginx部署前后端分离应用
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2022-06-12 18:11:06 / 修改时间：19:23:11" itemprop="dateCreated datePublished" datetime="2022-06-12T18:11:06+08:00">2022-06-12</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/DevOps/" itemprop="url" rel="index"><span itemprop="name">DevOps</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h1 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h1><p>使用CI/CD及docker容器部署一个简单的web应用时，利用docker context可以简单快速地进行远程镜像部署，而无需任何镜像托管服务进行发布和拉取。本篇博文中的例子将以Nginx作为反向代理服务器。</p>
+<h1 id="思路"><a href="#思路" class="headerlink" title="思路"></a>思路</h1><p>配置好生产服务器的SSH连接后，即可利用docker context进行远程容器部署。其中前端应用由于只是静态文件，在GitHub Action中编译后直接上传至远程服务器。<br>以下例子采用</p>
+<ul>
+<li>前端：Angular应用</li>
+<li>后端：.NET Core WebAPI</li>
+<li>反向代理：Nginx</li>
+</ul>
+<h1 id="编码"><a href="#编码" class="headerlink" title="编码"></a>编码</h1><ol>
+<li><p>Dockerfile编写</p>
+<ul>
+<li><p>.NET Core服务端</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">FROM mcr.microsoft.com/dotnet/aspnet:6.0 AS base</span><br><span class="line">WORKDIR /app</span><br><span class="line">EXPOSE 80</span><br><span class="line"></span><br><span class="line">FROM mcr.microsoft.com/dotnet/sdk:6.0 AS build</span><br><span class="line">WORKDIR /src</span><br><span class="line">COPY [&quot;My.Server.csproj&quot;, &quot;My.Server/&quot;]</span><br><span class="line">RUN dotnet restore &quot;My.Server/My.Server.csproj&quot; </span><br><span class="line">COPY . My.Server/</span><br><span class="line">WORKDIR &quot;/src/My.Server&quot;</span><br><span class="line">RUN dotnet build &quot;My.Server.csproj&quot; -c Release -o /app/build</span><br><span class="line"></span><br><span class="line">FROM build AS publish</span><br><span class="line">RUN dotnet publish &quot;My.Server.csproj&quot; -c Release -o /app/publish</span><br><span class="line"></span><br><span class="line">FROM base AS final</span><br><span class="line">WORKDIR /app</span><br><span class="line">COPY --from=publish /app/publish .</span><br><span class="line">ENTRYPOINT [&quot;dotnet&quot;, &quot;My.Server.dll&quot;]</span><br></pre></td></tr></table></figure></li>
+<li><p>Angular应用</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">FROM node:16 AS build</span><br><span class="line">WORKDIR /usr/local/app</span><br><span class="line">COPY . .</span><br><span class="line">RUN npm install &amp;&amp; npm run build:prod</span><br><span class="line"></span><br><span class="line">FROM nginx:latest</span><br><span class="line">COPY --from=build /usr/local/app/dist/apps/myapp /usr/share/nginx/html</span><br><span class="line">EXPOSE 80</span><br></pre></td></tr></table></figure></li>
+</ul>
+</li>
+<li><p>docker-compose编写</p>
+</li>
+</ol>
+<ul>
+<li>为了方便在服务运行时直接修改Nginx配置而不需要重启容器，博主在相应的service中进行了挂载配置，以让Nginx容器读取服务器本地的配置文件。同样对日志及Web静态文件进行挂载配置。需要在第一次部署前在远程服务器中创建好相应的目录。Nginx配置文件可以一并提前创建好，也可在源码中签入一份默认Nginx配置并在GitHub Actions中上传至远程机。</li>
+<li>由于Nginx和后端应用作为两个镜像部署，需要配置network以支持容器间通信。Nginx在宿主机中暴露80端口，后端应用在my_net网络中暴露80端口，可对Nginx依据这些地址进行相应配置。</li>
+</ul>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">version:</span> <span class="string">&#x27;3.7&#x27;</span></span><br><span class="line"></span><br><span class="line"><span class="attr">services:</span></span><br><span class="line">  <span class="attr">nginx:</span></span><br><span class="line">    <span class="attr">image:</span> <span class="string">nginx:latest</span></span><br><span class="line">    <span class="attr">container_name:</span> <span class="string">my_nginx</span></span><br><span class="line">    <span class="attr">volumes:</span></span><br><span class="line">      <span class="bullet">-</span> <span class="string">/etc/nginx/conf.d/default.prod.conf:/etc/nginx/conf.d/default.conf:ro</span></span><br><span class="line">      <span class="bullet">-</span> <span class="string">/var/log/nginx/prod:/var/log/nginx</span></span><br><span class="line">      <span class="bullet">-</span> <span class="string">/usr/share/nginx/html/prod:/usr/share/nginx/html</span></span><br><span class="line">    <span class="attr">networks:</span></span><br><span class="line">      <span class="attr">my_net:</span></span><br><span class="line">        <span class="attr">ipv4_address:</span> <span class="number">172.30</span><span class="number">.1</span><span class="number">.3</span></span><br><span class="line">    <span class="attr">ports:</span></span><br><span class="line">      <span class="bullet">-</span> <span class="string">&quot;80:80&quot;</span></span><br><span class="line"></span><br><span class="line">  <span class="attr">my-backend:</span></span><br><span class="line">    <span class="attr">image:</span> <span class="string">&#x27;my/service:latest&#x27;</span></span><br><span class="line">    <span class="attr">container_name:</span> <span class="string">my_service</span></span><br><span class="line">    <span class="attr">build:</span></span><br><span class="line">      <span class="attr">context:</span> <span class="string">./My.Server/My.Server</span></span><br><span class="line">      <span class="attr">dockerfile:</span> <span class="string">./Dockerfile</span></span><br><span class="line">    <span class="attr">environment:</span> <span class="comment"># 根据实际需要，在这里提供配置项以覆盖appsettings.json中的配置</span></span><br><span class="line">      <span class="bullet">-</span> <span class="string">App__BaseUrl=http://my-server-domain-name/api</span></span><br><span class="line">    <span class="attr">networks:</span></span><br><span class="line">      <span class="attr">my_net:</span></span><br><span class="line">        <span class="attr">ipv4_address:</span> <span class="number">172.30</span><span class="number">.1</span><span class="number">.8</span></span><br><span class="line"></span><br><span class="line"><span class="attr">networks:</span></span><br><span class="line">  <span class="attr">my_net:</span></span><br><span class="line">    <span class="attr">driver:</span> <span class="string">bridge</span></span><br><span class="line">    <span class="attr">ipam:</span></span><br><span class="line">      <span class="attr">driver:</span> <span class="string">default</span></span><br><span class="line">      <span class="attr">config:</span></span><br><span class="line">        <span class="bullet">-</span> <span class="attr">subnet:</span> <span class="number">172.30</span><span class="number">.1</span><span class="number">.0</span><span class="string">/24</span></span><br><span class="line">          <span class="attr">gateway:</span> <span class="number">172.30</span><span class="number">.1</span><span class="number">.1</span></span><br></pre></td></tr></table></figure>
+
+<ol start="3">
+<li>最后的GitHub Actions文件<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">name:</span> <span class="string">Build</span> <span class="string">and</span> <span class="string">Deploy</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 依据实际情况配置触发条件，这里配置为手动触发模拟正式环境部署</span></span><br><span class="line"><span class="attr">on:</span> <span class="string">workflow_dispatch</span></span><br><span class="line"></span><br><span class="line"><span class="attr">env:</span></span><br><span class="line">  <span class="attr">ANGULAR_ROOT_DIR:</span> <span class="string">./My.AngularUI</span></span><br><span class="line"></span><br><span class="line"><span class="attr">jobs:</span></span><br><span class="line">  <span class="attr">build-and-deploy:</span></span><br><span class="line">    <span class="attr">name:</span> <span class="string">Build</span> <span class="string">and</span> <span class="string">Deploy</span></span><br><span class="line">    <span class="attr">runs-on:</span> <span class="string">ubuntu-latest</span></span><br><span class="line">    <span class="attr">steps:</span></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">uses:</span> <span class="string">actions/checkout@v2.3.4</span></span><br><span class="line"></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">Use</span> <span class="string">Node</span> <span class="number">16.</span><span class="string">x</span></span><br><span class="line">        <span class="attr">uses:</span> <span class="string">actions/setup-node@v3.1.1</span></span><br><span class="line">        <span class="attr">with:</span></span><br><span class="line">          <span class="attr">node-version:</span> <span class="string">&#x27;16.10.0&#x27;</span></span><br><span class="line"></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">Install</span> <span class="string">dependencies</span></span><br><span class="line">        <span class="attr">run:</span> <span class="string">npm</span> <span class="string">ci</span></span><br><span class="line">        <span class="attr">working-directory:</span> <span class="string">$&#123;&#123;</span> <span class="string">env.ANGULAR_ROOT_DIR</span> <span class="string">&#125;&#125;</span></span><br><span class="line"></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">Build</span> <span class="string">Angular</span></span><br><span class="line">        <span class="attr">run:</span> <span class="string">npm</span> <span class="string">run</span> <span class="string">build:prod</span></span><br><span class="line">        <span class="attr">working-directory:</span> <span class="string">$&#123;&#123;</span> <span class="string">env.ANGULAR_ROOT_DIR</span> <span class="string">&#125;&#125;</span></span><br><span class="line"></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">Deploy</span> <span class="string">angular</span> <span class="string">to</span> <span class="string">production</span> <span class="string">server</span></span><br><span class="line">        <span class="attr">uses:</span> <span class="string">appleboy/scp-action@v0.1.2</span></span><br><span class="line">        <span class="attr">with:</span></span><br><span class="line">          <span class="attr">host:</span> <span class="string">$&#123;&#123;</span> <span class="string">secrets.REMOTE_HOST</span> <span class="string">&#125;&#125;</span></span><br><span class="line">          <span class="attr">username:</span> <span class="string">$&#123;&#123;</span> <span class="string">secrets.REMOTE_USER</span> <span class="string">&#125;&#125;</span></span><br><span class="line">          <span class="attr">key:</span> <span class="string">$&#123;&#123;</span> <span class="string">secrets.SSH_PRIVATE_KEY</span> <span class="string">&#125;&#125;</span></span><br><span class="line">          <span class="attr">source:</span> <span class="string">&quot;$<span class="template-variable">&#123;&#123; env.ANGULAR_ROOT_DIR &#125;&#125;</span>/dist/apps/myapp/*&quot;</span></span><br><span class="line">          <span class="attr">target:</span> <span class="string">$&#123;&#123;</span> <span class="string">secrets.FRONT_TARGET_PATH_PROD</span> <span class="string">&#125;&#125;</span></span><br><span class="line">          <span class="attr">strip_components:</span> <span class="number">4</span></span><br><span class="line"></span><br><span class="line">      <span class="comment"># 这里配置pipeline中的SSH公私钥及远程地址。</span></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">Setup</span> <span class="string">ssh</span> <span class="string">key</span></span><br><span class="line">        <span class="attr">run:</span> <span class="string">|</span></span><br><span class="line"><span class="string">          mkdir -p &quot;$HOME/.ssh&quot;</span></span><br><span class="line"><span class="string"></span></span><br><span class="line">          <span class="string">printf</span> <span class="string">&#x27;%s\n&#x27;</span> <span class="string">&quot;$<span class="template-variable">&#123;&#123; secrets.SSH_PRIVATE_KEY&#125;&#125;</span>&quot;</span> <span class="string">&gt;</span> <span class="string">&quot;$HOME/.ssh/id_rsa&quot;</span></span><br><span class="line">          <span class="string">chmod</span> <span class="number">600</span> <span class="string">&quot;$HOME/.ssh/id_rsa&quot;</span></span><br><span class="line"></span><br><span class="line">          <span class="string">printf</span> <span class="string">&#x27;%s\n&#x27;</span> <span class="string">&quot;$<span class="template-variable">&#123;&#123; secrets.SSH_PUBLIC_KEY&#125;&#125;</span>&quot;</span> <span class="string">&gt;</span> <span class="string">&quot;$HOME/.ssh/id_rsa.pub&quot;</span></span><br><span class="line">          <span class="string">chmod</span> <span class="number">600</span> <span class="string">$HOME/.ssh/id_rsa.pub</span></span><br><span class="line"></span><br><span class="line">          <span class="string">ssh-keyscan</span> <span class="string">-p</span> <span class="number">22</span> <span class="string">&quot;$<span class="template-variable">&#123;&#123; secrets.REMOTE_HOST &#125;&#125;</span>&quot;</span> <span class="string">&gt;&gt;</span> <span class="string">&quot;$HOME/.ssh/known_hosts&quot;</span></span><br><span class="line"></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">Docker</span> <span class="string">compose</span> <span class="string">up</span></span><br><span class="line">        <span class="attr">run:</span> <span class="string">|</span></span><br><span class="line"><span class="string">          docker context create remote --docker &quot;host=ssh://$&#123;&#123; secrets.REMOTE_USER &#125;&#125;@$&#123;&#123; secrets.REMOTE_HOST &#125;&#125;&quot;</span></span><br><span class="line"><span class="string">          docker context use remote</span></span><br><span class="line"><span class="string">          docker compose -f docker-compose.prod.yml up -d --build</span></span><br></pre></td></tr></table></figure></li>
+</ol>
+
+    </div>
+
+    
+    
+    
+
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/DevOps/" rel="tag"># DevOps</a>
+              <a href="/tags/GitHub-Actions/" rel="tag"># GitHub Actions</a>
+              <a href="/tags/docker/" rel="tag"># docker</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/powershell-1/" rel="prev" title="记录一个简单但很有用的Powershell脚本">
+      <i class="fa fa-chevron-left"></i> 记录一个简单但很有用的Powershell脚本
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%83%8C%E6%99%AF"><span class="nav-number">1.</span> <span class="nav-text">背景</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%80%9D%E8%B7%AF"><span class="nav-number">2.</span> <span class="nav-text">思路</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%BC%96%E7%A0%81"><span class="nav-number">3.</span> <span class="nav-text">编码</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Jim Zheng</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">9</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">3</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-name">标签</span>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/jimmidier" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;jimmidier" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:jimzheng@ssw.com.au" title="E-Mail → mailto:jimzheng@ssw.com.au" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  Copyright &copy; 2021 – 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="author" itemprop="copyrightHolder">Jim Zheng</span> - All Rights Reserved.
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://pisces.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
