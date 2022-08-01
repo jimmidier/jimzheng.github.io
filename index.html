@@ -155,6 +155,185 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://jimzheng.com/devexpress-reporting-2/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Jim Zheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Jim的博客">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/devexpress-reporting-2/" class="post-title-link" itemprop="url">DevExpress Reporting - JavaScript Client中实现子报表跳转</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-08-01 22:14:26" itemprop="dateCreated datePublished" datetime="2022-08-01T22:14:26+08:00">2022-08-01</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-08-02 01:27:11" itemprop="dateModified" datetime="2022-08-02T01:27:11+08:00">2022-08-02</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/DevExpress/" itemprop="url" rel="index"><span itemprop="name">DevExpress</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h1 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h1><p>前篇博文介绍了DevExpress Reporting在ASP.NET Core服务端中实现自定义扩展的用例，本篇博文将分享一个在JavaScript客户端中实现报表间跳转、返回的方法。</p>
+<h1 id="思路"><a href="#思路" class="headerlink" title="思路"></a>思路</h1><p>对于<code>DocumentViewer</code>，DevExpress的JavaScript包提供了若干种事件的回调钩子，其中一个名为<code>PreviewClick</code>的回调可以用于实现自定义的跳转逻辑。另外我们将利用另一个事件<code>DocumentReady</code>实现返回后自动滚动至跳转前的页数的逻辑。</p>
+<h1 id="编码"><a href="#编码" class="headerlink" title="编码"></a>编码</h1><ol>
+<li>在我们引入DevExpress Reporting时创建的<code>viewerOptions</code>中，添加<code>PreviewClick</code>回调函数：</li>
+</ol>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">PreviewClick: <span class="function"><span class="keyword">function</span> (<span class="params">s, e</span>) </span>&#123;</span><br><span class="line">    <span class="keyword">var</span> brick = e.Brick;</span><br><span class="line">    <span class="keyword">var</span> navigationUrl = brick &amp;&amp; brick.navigation &amp;&amp; brick.navigation.url;</span><br><span class="line">    <span class="keyword">var</span> navigationTarget = brick &amp;&amp; brick.navigation &amp;&amp; brick.navigation.target;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (navigationTarget &amp;&amp; navigationTarget.trim().toUpperCase() === <span class="string">&#x27;REPORT&#x27;</span> &amp;&amp; navigationUrl) &#123;</span><br><span class="line">        <span class="keyword">var</span> reportPreview = s.GetReportPreview();</span><br><span class="line">        <span class="keyword">var</span> isBack = navigationUrl.trim().toUpperCase() === <span class="string">&#x27;BACK&#x27;</span>;</span><br><span class="line">        <span class="keyword">var</span> navigateInfo = &#123;</span><br><span class="line">            <span class="attr">ReportUrl</span>: navigationUrl,</span><br><span class="line">            <span class="attr">IsBack</span>: isBack,</span><br><span class="line">            <span class="attr">SourcePageIndex</span>: isBack ? <span class="literal">null</span> : s.GetCurrentPageIndex()</span><br><span class="line">        &#125;;</span><br><span class="line"></span><br><span class="line">        reportPreview.drillThrough(<span class="built_in">JSON</span>.stringify(navigateInfo));</span><br><span class="line">        e.Handled = <span class="literal">true</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>博主在这段代码中，默认支持报表在设计时，通过指定<code>Navigation Url</code>为报表数据Url，<code>Navigation Target</code>为”Report”或”Back”（大小写不敏感），以支持非常简单的跳转/返回设置。</p>
+<ol start="2">
+<li>当从多页报表中跳转到子报表后需要返回至原页，我们可通过一个在后端保存并传递的报表参数在<code>DocumentReady</code>回调中获取原页数。博主在这里使用<code>PageIndex</code>作为参数名。后端的具体逻辑可参考上篇博文<a href="/devexpress-reporting-1">DevExpress Reporting - ASP.NET Core项目中实现参数校验</a>。</li>
+</ol>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">DocumentReady: <span class="function"><span class="keyword">function</span> (<span class="params">s, e</span>) </span>&#123;</span><br><span class="line">    <span class="keyword">var</span> previewModel = s.GetPreviewModel();</span><br><span class="line">    <span class="keyword">var</span> parametersModel = s.GetParametersModel();</span><br><span class="line">    <span class="keyword">var</span> pageIndexParameter = parametersModel.serializeParameters().find(<span class="function"><span class="params">p</span> =&gt;</span> p.Key === <span class="string">&#x27;PageIndex&#x27;</span>);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (pageIndexParameter) &#123;</span><br><span class="line">        <span class="built_in">setTimeout</span>(<span class="function">() =&gt;</span> &#123;</span><br><span class="line">            previewModel.GoToPage(<span class="built_in">Math</span>.max(pageIndexParameter.Value, <span class="number">0</span>));</span><br><span class="line">        &#125;, <span class="number">200</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+      
+    </div>
+
+    
+    
+    
+
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://jimzheng.com/devexpress-reporting-1/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Jim Zheng">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Jim的博客">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/devexpress-reporting-1/" class="post-title-link" itemprop="url">DevExpress Reporting - ASP.NET Core项目中实现参数校验</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-07-20 20:45:33" itemprop="dateCreated datePublished" datetime="2022-07-20T20:45:33+08:00">2022-07-20</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-08-02 01:12:45" itemprop="dateModified" datetime="2022-08-02T01:12:45+08:00">2022-08-02</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/DevExpress/" itemprop="url" rel="index"><span itemprop="name">DevExpress</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h1 id="背景"><a href="#背景" class="headerlink" title="背景"></a>背景</h1><p>DevExpress Reporting是DevExpress产品系列下的一个重要的模块，能在WinForms，WPS，ASP.NET，Blazor等众多平台下帮助用户快速创建美观的报告、报表。在构建通用程度高的报表时，往往需要接收参数以生成对应条件下的报表。本片博文将分享在ASP.NET Core中如何实现定制化的报表参数校验机制。</p>
+<h1 id="思路"><a href="#思路" class="headerlink" title="思路"></a>思路</h1><p>DevExpress Reporting的SDK提供了一个叫<code>WebDocumentViewerOperationLogger</code>的类，根据名字也可推断这个类是作为Viewer生成过程中的日志方法的基类。通过简单的反编译可以发现这个类包含了众多标记为virtual方法，基本涵盖了从报表打开到报表实例销毁的整个生命周期，而这个基类本身对各个方法基本是空实现，所以从设计上看这个类就是专门为用户自定义扩展而存在的。</p>
+<h1 id="编码"><a href="#编码" class="headerlink" title="编码"></a>编码</h1><ol>
+<li>创建继承<code>WebDocumentViewerOperationLogger</code>的子类<code>CustomWebDocumentViewerOperationLogger</code>：</li>
+</ol>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title">CustomWebDocumentViewerOperationLogger</span> : <span class="title">WebDocumentViewerOperationLogger</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">readonly</span> IReportInterceptorService _reportInterceptorService;</span><br><span class="line">    </span><br><span class="line">    ...</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">override</span> <span class="keyword">async</span> Task&lt;Action&gt; <span class="title">BuildStartingAsync</span>(<span class="params"><span class="built_in">string</span> reportId, <span class="built_in">string</span> reportUrl, XtraReport report, ReportBuildProperties buildProperties</span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">await</span> _reportInterceptorService.PreBuildStartAsync(report.Name, buildProperties.Parameters);</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">null</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>在这里博主只演示重写BuildStartingAsync的方法，读者可自行选择生命周期事件进行重写。博主使用了一个另外一个服务类来提供具体的事件处理业务。需要注意的是方法签名中的4个参数，其中<code>report</code>参数提供了当前报表文档示例的所有属性，而<code>buildProperties</code>参数中提供了用户输入的报表参数。</p>
+<ol start="2">
+<li>在具体业务逻辑类中进行参数校验：</li>
+</ol>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title">DonationTaxSummaryReportInterceptor</span> : <span class="title">IReportInterceptorService</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">override</span> Task <span class="title">PreBuildStartAsync</span>(<span class="params"><span class="built_in">string</span> reportName, Dictionary&lt;<span class="built_in">string</span>, <span class="built_in">object</span>&gt; parameters</span>)</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">var</span> dateRange = GetDateRange(parameters);</span><br><span class="line">        <span class="keyword">if</span> (!dateRange.HasValue)</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="keyword">throw</span> <span class="keyword">new</span> ArgumentException(<span class="string">&quot;Please select a year range.&quot;</span>);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> Task.CompletedTask;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> (DateTime, DateTime)? GetDateRange(Dictionary&lt;<span class="built_in">string</span>, <span class="built_in">object</span>&gt; parameters)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">var</span> years = parameters[<span class="string">&quot;Years&quot;</span>] <span class="keyword">as</span> <span class="built_in">string</span>;</span><br><span class="line">        <span class="keyword">if</span> (<span class="built_in">string</span>.IsNullOrWhiteSpace(years) || year.Length != <span class="number">8</span>)</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">null</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (<span class="built_in">int</span>.TryParse(years[.<span class="number">.4</span>], <span class="keyword">out</span> <span class="keyword">var</span> yearFrom) &amp;&amp; <span class="built_in">int</span>.TryParse(years[^<span class="number">4.</span>.], <span class="keyword">out</span> <span class="keyword">var</span> yearTo))</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="keyword">var</span> dateFrom = <span class="keyword">new</span> DateTime(yearFrom, <span class="number">4</span>, <span class="number">1</span>);</span><br><span class="line">            <span class="keyword">var</span> dateTo = <span class="keyword">new</span> DateTime(yearTo, <span class="number">3</span>, <span class="number">31</span>);</span><br><span class="line"></span><br><span class="line">            <span class="keyword">return</span> (dateFrom, dateTo);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> <span class="literal">null</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这里以校验一个必需的年份范围参数为例，若校验失败，则直接抛出异常，因为这个类并不应具有处理异常的能力。</p>
+<ol start="3">
+<li>参数校验完毕后，如果有失败的结果以异常的形式向上抛出，我们可以在上层捕获，处理为用户友好文字后，最终以<code>DocumentCreationException</code>的形式抛出。<code>DocumentCreationException</code>类是DevExpress的SDK中定义的异常类，在文档实例生命周期中抛出的该类型的类会被DevExpress处理为前端页面可识别的异常，最终显示在用户界面上。</li>
+</ol>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title">HandleDocumentBuildException</span>(<span class="params">Exception e</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="built_in">string</span> message;</span><br><span class="line">    <span class="keyword">if</span> (e <span class="keyword">is</span> AggregateException aggregateException)</span><br><span class="line">    &#123;</span><br><span class="line">        message = aggregateException.InnerExceptions.First().Message;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">else</span></span><br><span class="line">    &#123;</span><br><span class="line">        message = e.Message;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">throw</span> <span class="keyword">new</span> DocumentCreationException(<span class="built_in">string</span>.IsNullOrEmpty(message) ? <span class="string">&quot;Internal Server Error&quot;</span> : message);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+      
+    </div>
+
+    
+    
+    
+
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://jimzheng.com/devops-docker-context/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -420,7 +599,7 @@
 <li><p>测试写完了，我们来跑一下：</p>
 </li>
 </ol>
-<p><img src="/abp-extension-3-test/test-result.png" alt="测试结果"></p>
+<p><img src="/test-result.png" alt="测试结果"></p>
 <p>完美通过。</p>
 <p>至此状态管理模块的开发与测试已全部完毕。</p>
 
@@ -1073,100 +1252,11 @@
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://jimzheng.com/abp-extension-preface/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="Jim Zheng">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Jim的博客">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/abp-extension-preface/" class="post-title-link" itemprop="url">基于Abp的扩展模块实现 - 前言</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2021-06-26 14:28:03" itemprop="dateCreated datePublished" datetime="2021-06-26T14:28:03+08:00">2021-06-26</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2021-12-22 23:54:28" itemprop="dateModified" datetime="2021-12-22T23:54:28+08:00">2021-12-22</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Abp/" itemprop="url" rel="index"><span itemprop="name">Abp</span></a>
-                </span>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p><font size=4 style="font-weight:bold;">其他系列博文</font></p>
-<ul>
-<li><a href="/abp-extension-1">基于Abp的扩展模块实现第1例 - 数据权限控制（开发）</a></li>
-<li><a href="/abp-extension-1-test">基于Abp的扩展模块实现第1例 - 数据权限控制（测试）</a></li>
-<li><a href="/abp-extension-2">基于Abp的扩展模块实现第2例 - 数据字段按需更新（开发）</a></li>
-<li><a href="/abp-extension-2-test">基于Abp的扩展模块实现第2例 - 数据字段按需更新（测试）</a></li>
-<li><a href="/abp-extension-3">基于Abp的扩展模块实现第3例 - 状态管理（开发）</a></li>
-<li><a href="/abp-extension-3-test">基于Abp的扩展模块实现第3例 - 状态管理（测试）</a></li>
-</ul>
-<h1 id="关于ABP-Framework"><a href="#关于ABP-Framework" class="headerlink" title="关于ABP Framework"></a>关于ABP Framework</h1><p>&emsp;&emsp;<a target="_blank" rel="noopener" href="https://abp.io/">ABP Framework</a> 是一个遵循DDD实践的开源应用程序框架，专注于基于ASP.NET Core的Web应用程序开发，同时支持开发其他类型的应用程序，提供全栈的基础设施支持。该项目最早于2016年12月在 <a target="_blank" rel="noopener" href="https://github.com/abpframework/abp">GitHub</a>创建，截止本文发稿时已迭代至版本4.4.0-preview，收获6.3k个Star，在国内外.NET开发者中拥有较大知名度。</p>
-<p>&emsp;&emsp;ABP Framework（为简洁起见，以下均以Abp代指ABP Framework，若遇<a target="_blank" rel="noopener" href="https://aspnetboilerplate.com/">ASP.NET Boilerplate</a>则另行说明）通过对模块化的完整支持和基于DDD模式的分层设计，从架构分层和应用模块两个方向上进行了拆解和封装。相比更通用的仅对分层方向封装的做法，博主认为Abp的这种设计能更好地支持业务代码跨项目重用，且能更自然地实现微服务兼容。从另一个角度说，这也是种DRY的实践。</p>
-<p><img src="/abp-extension-preface/layered-project-dependencies-module.png" alt="模块依赖层次结构"></p>
-<h1 id="为什么要写这篇博文"><a href="#为什么要写这篇博文" class="headerlink" title="为什么要写这篇博文"></a>为什么要写这篇博文</h1><p>&emsp;&emsp;当具备一定规模时，应用框架的通用性与易用性总是会存在设计上的冲突。Abp作为一个重型应用框架，在尽可能保证通用性和可扩展性的同时，也不可避免地在定制化上作了一定牺牲。虽然它提供了数十种强大的基础设施和预构建模块，但是面临数量繁多的业务类型，在实际工程中仍经常会面临自行实现基础模块的需要。在使用Abp开发的过程中，博主曾尝试延续Abp的代码风格，针对工作过程中遇到的业务类型去开发基于Abp的扩展项目，希望作为官方的一个分支项目。然而对于整个ASP.NET平台来说，目前非常需要<strong>一个</strong>完整的生产级解决方案来弥补生态系统的缺失，这个解决方案需要在基础设施、单机应用直至云原生构建上都能作为企业首选。不论Abp是否具备这样的可能性，博主认为轮子在质不在量，好的轮子出现时，需要社区开发者优先考虑参与迭代已有的项目，而不是另起炉灶，为定制化牺牲通用性。出于这点考虑，博主目前已逐渐减少分配在扩展项目上的精力，转而关注并参与对Abp官方项目的贡献。</p>
-<p>&emsp;&emsp;与此同时，博主希望能在该系列博文中，把开发过程中的实践成果记录下来，为其他Abp开发者提供参考，开发者可自行决定直接使用或与社区分享。Abp作为.NET圈一个颇为年轻的产物，目前仍在快速迭代中，版本更替后更多预构建模块也在不停出现。受限于博文的时效性，博主使用的代码可能不适用于后续版本，设计的模块也可能后续由官方提供更好的实现。但是Abp的核心结构已经成型，模块的设计思路不会失效，博主希望能抛砖引玉，为其他开发者提供帮助。</p>
-<h1 id="P-S"><a href="#P-S" class="headerlink" title="P.S."></a>P.S.</h1><p>&emsp;&emsp;Abp提供了详尽的<a target="_blank" rel="noopener" href="https://docs.abp.io/">技术文档</a>，并且由官方积极维护中。为了减少重复，该系列博文不会涉及Abp的基本使用。</p>
-<p>&emsp;&emsp;受限于博主的技术水平，博文中的技术部分难免有不当之处，欢迎批评指正。</p>
-<p>&emsp;&emsp;最后，希望Abp社区继续壮大，.NET技术越来越受欢迎。</p>
-
-      
-    </div>
-
-    
-    
-    
-
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
+  <nav class="pagination">
+    <span class="page-number current">1</span><a class="page-number" href="/page/2/">2</a><a class="extend next" rel="next" href="/page/2/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
+  </nav>
 
 
 
@@ -1231,18 +1321,18 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">9</span>
+          <span class="site-state-item-count">11</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
             <a href="/categories/">
           
-        <span class="site-state-item-count">3</span>
+        <span class="site-state-item-count">4</span>
         <span class="site-state-item-name">分类</span></a>
       </div>
       <div class="site-state-item site-state-tags">
-        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-count">8</span>
         <span class="site-state-item-name">标签</span>
       </div>
   </nav>
